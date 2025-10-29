@@ -22,7 +22,7 @@ backend_ros/
 │     └─ orchestrator.py   # main orchestration node (pick&place workflow)
 └─ README.md
 
-# MOnolithic
+# Monolithic
 robotics_project/
 ├── main.py           # FastAPI + rclpy 통합 서버
 ├── frontend.py       # Gradio UI (FastAPI mount)

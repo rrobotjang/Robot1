@@ -22,3 +22,10 @@ backend_ros/
 │     └─ orchestrator.py   # main orchestration node (pick&place workflow)
 └─ README.md
 
+# MOnolithic
+robotics_project/
+├── main.py           # FastAPI + rclpy 통합 서버
+├── frontend.py       # Gradio UI (FastAPI mount)
+├── ros_bridge.py     # ROS2 서비스 호출 로직
+├── tts_feedback.py   # OpenAI Realtime API 호출
+└── requirements.txt

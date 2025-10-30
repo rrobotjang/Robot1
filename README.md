@@ -34,3 +34,5 @@ robotics_project/
 
 #실행
 uvicorn main:app --reload
+⚠️ ROS2와 FastAPI가 같은 이벤트 루프에 있을 경우,
+asyncio.create_task() + rclpy.spin_until_future_complete() 패턴으로 비동기 안전하게 구성 필요.

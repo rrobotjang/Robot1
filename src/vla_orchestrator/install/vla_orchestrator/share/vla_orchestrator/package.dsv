@@ -4,3 +4,6 @@ source;share/vla_orchestrator/hook/pythonpath.sh
 source;share/vla_orchestrator/hook/ament_prefix_path.ps1
 source;share/vla_orchestrator/hook/ament_prefix_path.dsv
 source;share/vla_orchestrator/hook/ament_prefix_path.sh
+source;../../build/vla_orchestrator/share/vla_orchestrator/hook/pythonpath_develop.ps1
+source;../../build/vla_orchestrator/share/vla_orchestrator/hook/pythonpath_develop.dsv
+source;../../build/vla_orchestrator/share/vla_orchestrator/hook/pythonpath_develop.sh

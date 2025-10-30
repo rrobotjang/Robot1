@@ -1,0 +1,14 @@
+running develop
+running egg_info
+writing vla_orchestrator.egg-info/PKG-INFO
+writing dependency_links to vla_orchestrator.egg-info/dependency_links.txt
+writing entry points to vla_orchestrator.egg-info/entry_points.txt
+writing requirements to vla_orchestrator.egg-info/requires.txt
+writing top-level names to vla_orchestrator.egg-info/top_level.txt
+reading manifest file 'vla_orchestrator.egg-info/SOURCES.txt'
+writing manifest file 'vla_orchestrator.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/psh/Robot1/src/vla_orchestrator/install/vla_orchestrator/lib/python3.10/site-packages/vla-orchestrator.egg-link (link to .)
+Installing orchestrator script to /home/psh/Robot1/src/vla_orchestrator/install/vla_orchestrator/lib/vla_orchestrator
+
+Installed /home/psh/Robot1/src/vla_orchestrator/build/vla_orchestrator

@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 # Import local packages (these should be implemented in their packages)
 # from vla_perception.pc_detector import detect_from_pointcloud
-# from vla_motion.moveit_client import MoveItClient
+from vla_motion.moveit_client import MoveItClient
 # from vla_control.gripper_interface import GripperInterface
 
 # Configuration
@@ -52,7 +52,7 @@ class Orchestrator(Node):
         self.task_lock = threading.Lock()
 
         # instantiate hardware wrappers (replace with actual implementations)
-        # self.moveit = MoveItClient(group_name="manipulator")
+        self.moveit = MoveItClient(group_name="manipulator")
         # self.gripper = GripperInterface(command_topic="/robotis/gripper/command")
 
     # --- callbacks ---
@@ -97,20 +97,20 @@ class Orchestrator(Node):
         # Plan + execute approach -> grasp -> lift using MoveIt
         try:
             self.get_logger().info(f"Plan approach to {approach}")
-            # self.moveit.set_pose_target(approach)
-            # plan_ok = self.moveit.plan_and_execute()
+            self.moveit.set_pose_target(approach)
+            plan_ok = self.moveit.plan_and_execute()
             # if not plan_ok: raise RuntimeError("Approach plan failed")
             # open gripper
-            # self.gripper.open()
+            self.gripper.open()
             # plan to grasp
             self.get_logger().info(f"Plan grasp to {grasp_pose}")
-            # self.moveit.set_pose_target(grasp_pose)
-            # self.moveit.plan_and_execute()
+            self.moveit.set_pose_target(grasp_pose)
+            self.moveit.plan_and_execute()
             # close gripper
-            # self.gripper.close()
+            self.gripper.close()
             # lift
             lift = dict(grasp_pose); lift["z"] += 0.2
-            # self.moveit.set_pose_target(lift); self.moveit.plan_and_execute()
+            self.moveit.set_pose_target(lift); self.moveit.plan_and_execute()
             self.get_logger().info("Pick executed (mock)")
             return True
         except Exception as e:
@@ -123,10 +123,10 @@ class Orchestrator(Node):
             return False
         try:
             approach = dict(slot_pose); approach["z"] += 0.12
-            # self.moveit.set_pose_target(approach); self.moveit.plan_and_execute()
-            # self.moveit.set_pose_target(slot_pose); self.moveit.plan_and_execute()
-            # self.gripper.open()
-            # self.moveit.set_pose_target(approach); self.moveit.plan_and_execute()
+            self.moveit.set_pose_target(approach); self.moveit.plan_and_execute()
+            self.moveit.set_pose_target(slot_pose); self.moveit.plan_and_execute()
+            self.gripper.open()
+            self.moveit.set_pose_target(approach); self.moveit.plan_and_execute()
             self.get_logger().info("Place executed (mock)")
             return True
         except Exception as e:

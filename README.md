@@ -29,3 +29,6 @@ robotics_project/
 ├── ros_bridge.py     # ROS2 서비스 호출 로직
 ├── tts_feedback.py   # OpenAI Realtime API 호출
 └── requirements.txt
+
+#실행
+uvicorn main:app --reload

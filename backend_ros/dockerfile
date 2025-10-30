@@ -1,0 +1,31 @@
+# Dockerfile (예: Perception Layer의 'object_detector_node' 패키지)
+
+# 1. ROS 2 기본 환경 설정 (NVIDIA GPU 지원 필수)
+FROM ros:humble-ros-base-l4t-r32.7.1 # NVIDIA Jetson 또는 GPU 기반 환경에 맞게 베이스 이미지 선택 (Isaac ROS 권장)
+
+# 2. 필요한 시스템 종속성 설치
+RUN apt update && apt install -y \
+    python3-pip \
+    python3-rosdep \
+    # ... 필요한 라이브러리 ...
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. ROS 워크스페이스 설정
+WORKDIR /robot_ws
+# ROS 환경 변수 소싱 (베이스 이미지에 따라 다를 수 있음)
+SHELL ["/bin/bash", "-c"]
+
+# 4. ROS 패키지 코드 복사 및 빌드
+# (호스트 머신의 로컬 패키지를 컨테이너 내부로 복사)
+COPY ./src/perception_package /robot_ws/src/perception_package
+
+RUN rosdep install --from-paths src --ignore-src -r -y
+RUN colcon build --packages-select perception_package
+
+# 5. 실행 환경 설정
+# 빌드된 ROS 환경 소싱
+RUN echo "source /robot_ws/install/setup.bash" >> ~/.bashrc
+
+# 6. 컨테이너 실행 시 자동 실행될 명령어 정의
+# 최종적으로 ROS 노드를 실행하여 레이어 기능을 수행합니다.
+CMD ["ros2", "run", "perception_package", "object_detector_node"]

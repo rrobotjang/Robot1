@@ -1,0 +1,3 @@
+[console_scripts]
+orchestrator = vla_orchestrator.orchestrator_node:main
+

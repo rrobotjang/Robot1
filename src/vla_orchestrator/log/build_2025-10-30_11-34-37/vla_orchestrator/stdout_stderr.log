@@ -1,0 +1,26 @@
+running egg_info
+creating build/vla_orchestrator/vla_orchestrator.egg-info
+writing build/vla_orchestrator/vla_orchestrator.egg-info/PKG-INFO
+writing dependency_links to build/vla_orchestrator/vla_orchestrator.egg-info/dependency_links.txt
+writing entry points to build/vla_orchestrator/vla_orchestrator.egg-info/entry_points.txt
+writing requirements to build/vla_orchestrator/vla_orchestrator.egg-info/requires.txt
+writing top-level names to build/vla_orchestrator/vla_orchestrator.egg-info/top_level.txt
+writing manifest file 'build/vla_orchestrator/vla_orchestrator.egg-info/SOURCES.txt'
+reading manifest file 'build/vla_orchestrator/vla_orchestrator.egg-info/SOURCES.txt'
+writing manifest file 'build/vla_orchestrator/vla_orchestrator.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/psh/Robot1/src/vla_orchestrator/build/vla_orchestrator/build
+creating /home/psh/Robot1/src/vla_orchestrator/build/vla_orchestrator/build/lib
+creating /home/psh/Robot1/src/vla_orchestrator/build/vla_orchestrator/build/lib/vla_orchestrator
+copying vla_orchestrator/__init__.py -> /home/psh/Robot1/src/vla_orchestrator/build/vla_orchestrator/build/lib/vla_orchestrator
+running install
+running install_lib
+creating /home/psh/Robot1/src/vla_orchestrator/install/vla_orchestrator/lib/python3.10/site-packages/vla_orchestrator
+copying /home/psh/Robot1/src/vla_orchestrator/build/vla_orchestrator/build/lib/vla_orchestrator/__init__.py -> /home/psh/Robot1/src/vla_orchestrator/install/vla_orchestrator/lib/python3.10/site-packages/vla_orchestrator
+byte-compiling /home/psh/Robot1/src/vla_orchestrator/install/vla_orchestrator/lib/python3.10/site-packages/vla_orchestrator/__init__.py to __init__.cpython-310.pyc
+running install_egg_info
+Copying build/vla_orchestrator/vla_orchestrator.egg-info to /home/psh/Robot1/src/vla_orchestrator/install/vla_orchestrator/lib/python3.10/site-packages/vla_orchestrator-0.0.1-py3.10.egg-info
+running install_scripts
+Installing orchestrator script to /home/psh/Robot1/src/vla_orchestrator/install/vla_orchestrator/lib/vla_orchestrator
+writing list of installed files to '/home/psh/Robot1/src/vla_orchestrator/build/vla_orchestrator/install.log'

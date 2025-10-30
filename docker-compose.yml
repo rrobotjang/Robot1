@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # 1. 지각 레이어 (고속 비전)
+  perception:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.perception
+    runtime: nvidia # GPU 가속 사용 설정 (RTX 5080 활용)
+    environment:
+      - ROS_DOMAIN_ID=1
+    networks:
+      - ros2_network
+
+  # 2. 추론 레이어 (작업 계획/LLM 파서)
+  reasoning:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.reasoning
+    environment:
+      - ROS_DOMAIN_ID=1
+    networks:
+      - ros2_network
+    depends_on:
+      - perception # 지각 모듈이 먼저 시작되어야 함
+
+  # 3. 행동 레이어 (로봇 제어)
+  action:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.action
+    runtime: nvidia
+    environment:
+      - ROS_DOMAIN_ID=1
+    networks:
+      - ros2_network
+    depends_on:
+      - perception
+      - reasoning
+
+networks:
+  ros2_network:
+    # 모든 컨테이너가 이 네트워크를 통해 서로 토픽 통신 (ROS 2 Discovery)

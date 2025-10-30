@@ -22,6 +22,8 @@ backend_ros/
 │     └─ orchestrator.py   # main orchestration node (pick&place workflow)
 └─ README.md
 
+# https://github.com/Kitten171922/Robotics-Project-VLA/issues/1#issue-3555804102
+
 # Monolithic
 robotics_project/
 ├── main.py           # FastAPI + rclpy 통합 서버

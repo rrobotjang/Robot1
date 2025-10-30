@@ -1,6 +1,42 @@
 # Robotics-Project-VLA
-# To do
-1. robot_module.py에서 포즈 받아서 제어하는 기능을 수행하는 execute_robot_action()함수 개선
-2. robot_module.py에서 포즈 받아서 제어하는 기능을 수행하는 execute_robot_action()함수 예외처리
-3. clova_module.py에서 API연동 이슈 해결해야함
-4. main.py에서 clova를 사용한 채팅 구현하기
+backend_ros/
+├─ vla_perception/
+│  ├─ package.xml
+│  ├─ setup.cfg
+│  ├─ setup.py
+│  └─ vla_perception/
+│     └─ node_perception.py
+├─ vla_control/
+│  ├─ package.xml
+│  ├─ setup.cfg
+│  ├─ setup.py
+│  └─ vla_control/
+│     └─ gripper_node.py
+├─ vla_motion/
+│  ├─ package.xml
+│  ├─ setup.cfg
+│  ├─ setup.py
+│  ├─ launch/
+│  │  └─ vla_system_launch.py
+│  └─ vla_motion/
+│     └─ orchestrator.py   # main orchestration node (pick&place workflow)
+└─ README.md
+
+# https://github.com/Kitten171922/Robotics-Project-VLA/issues/1#issue-3555804102
+
+# Monolithic
+robotics_project/
+├── main.py           # FastAPI + rclpy 통합 서버
+├── frontend.py       # Gradio UI (FastAPI mount)
+├── ros_bridge.py     # ROS2 서비스 호출 로직
+├── tts_feedback.py   # OpenAI Realtime API 호출
+└── requirements.txt
+
+#실행
+uvicorn main:app --reload
+⚠️ ROS2와 FastAPI가 같은 이벤트 루프에 있을 경우,
+asyncio.create_task() + rclpy.spin_until_future_complete() 패턴으로 비동기 안전하게 구성 필요.
+
+# 프로젝트 세팅 finite state machine
+create_orchestrator.sh
+

@@ -1,3 +1,43 @@
+version: "3.9"
+
+services:
+  ros_core:
+    image: ros:humble
+    container_name: ros_core
+    command: >
+      bash -c "source /opt/ros/humble/setup.bash && ros2 run demo_nodes_cpp talker"
+    networks:
+      - vla_net
+
+  vla_backend:
+    build: ./vla_backend
+    container_name: vla_backend
+    depends_on:
+      - ros_core
+    environment:
+      - ROS_DOMAIN_ID=5
+    volumes:
+      - ./vla_backend:/app
+    networks:
+      - vla_net
+    ports:
+      - "8000:8000"
+
+  vla_frontend:
+    build: ./vla_frontend
+    container_name: vla_frontend
+    depends_on:
+      - vla_backend
+    ports:
+      - "8080:80"
+    networks:
+      - vla_net
+
+networks:
+  vla_net:
+    driver: bridge
+
+===================================================================================================================================================================
 version: '3.8'
 
 services:

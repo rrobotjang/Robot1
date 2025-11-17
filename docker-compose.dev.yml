@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  frontend:
+    build: ./frontend
+    command: python app.py
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./frontend:/app
+    environment:
+      - API_SERVER=http://backend:8000
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend:/app
+    environment:
+      - ROS_SERVER=http://ros2_bridge:9000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ros2_bridge
+
+  ros2_bridge:
+    build: ./ros2_bridge
+    command: ros2 run vla_bridge server
+    network_mode: host   # ROS2 DDS 통신 보존

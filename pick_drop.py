@@ -422,174 +422,164 @@ class RobotControllerNode(Node):
             self.gripper.terminate()
 
 
-def main(args=None):
-    rclpy.init(args=args)
+# main.py
+"""
+Depth Camera 기반 객체 인식 → Doosan E0509 (MoveIt2) → Two-Finger Gripper Pick & Place
+음성명령(API) 기반 동작 / 정지 제어 포함 (모놀리식 프로토타입)
+"""
 
-    dsr_node = rclpy.create_node("dsr_node", namespace=ROBOT_ID)
-    DR_init.__dsr__node = dsr_node
+import threading
+import time
+import asyncio
+from typing import Dict, Any
+from fastapi import FastAPI
+import uvicorn
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import Bool, String
 
-    try:
-    
-        from DSR_ROBOT2 import movel, wait, movej, get_current_posj
-        from DR_common2 import posx, posj
-    except ImportError as e:
-        print(f"DSR_ROBOT2 라이브러리를 임포트할 수 없습니다: {e}")
-        rclpy.shutdown()
-        exit(1)
+MAX_RETRIES = 3
+CAM_TOPIC = "/camera/depth/points"
+EMERGENCY_TOPIC = "/vla/emergency_stop"
+GRIPPER_CMD_TOPIC = "/vla/gripper/cmd"
 
-    robot_controller = RobotControllerNode()
+class VLAAgent(Node):
+    def __init__(self):
+        super().__init__("vla_agent_node")
+        self.create_subscription(PointCloud2, CAM_TOPIC, self.pc_callback, 10)
+        self.create_subscription(Bool, EMERGENCY_TOPIC, self.emergency_cb, 10)
+        self.gripper_pub = self.create_publisher(String, GRIPPER_CMD_TOPIC, 10)
 
-    cv2.namedWindow("RealSense Camera")
+        self.last_pc = None
+        self.emergency_stop = False
+        self.task_lock = threading.Lock()
+        self.get_logger().info("VLAAgent initialized.")
 
-    print("\n" + "="*70)
-    print("자동 물체 감지 및 로봇 제어 시스템 (XY 이동)")
-    print("="*70)
-    print("키 명령어:")
-    print("  [SPACE] : 물체 감지 및 자동 수집 시작")
-    print("  [ESC]   : 프로그램 종료")
-    print("="*70)
-    print("로봇 동작:")
-    print("  1. 홈 포즈: posj(0, 0, 90, 0, 90, 0)")
-    print("  2. TOOL 좌표계 기준 상대 이동 (ref=1, mod=1)")
-    print("  3. 감지된 물체로 XYZ 이동 (뎁스 기반)")
-    print("  4. 오프셋: Y=-60mm, Z=-150mm")
-    print("  5. 작업 후 홈으로 복귀 → 다음 물체 자동 처리")
-    print("="*70 + "\n")
+    # --- ROS Callbacks ---
+    def emergency_cb(self, msg: Bool):
+        self.emergency_stop = msg.data
+        if self.emergency_stop:
+            self.get_logger().warn("Emergency Stop Triggered")
 
-    try:
-        while rclpy.ok():
-            rclpy.spin_once(robot_controller, timeout_sec=0.001)
-            rclpy.spin_once(dsr_node, timeout_sec=0.001)
+    def pc_callback(self, pc_msg: PointCloud2):
+        self.last_pc = pc_msg
 
-            if robot_controller.latest_cv_color is not None:
-                display_image = robot_controller.latest_cv_color.copy()
-                
-                h, w, _ = display_image.shape
-                
-                # 중심점 표시
-                cv2.circle(display_image, (w // 2, h // 2), 5, (0, 0, 255), -1)
-                cv2.line(display_image, (w // 2 - 20, h // 2), (w // 2 + 20, h // 2), (0, 0, 255), 2)
-                cv2.line(display_image, (w // 2, h // 2 - 20), (w // 2, h // 2 + 20), (0, 0, 255), 2)
-                
-                # 감지된 물체 표시
-                if len(robot_controller.detected_objects) > 0:
-                    for idx, obj in enumerate(robot_controller.detected_objects):
-                        u, v = obj["pixel_u"], obj["pixel_v"]
-                        if 0 <= u < w and 0 <= v < h:
-                            color = (0, 255, 0) if idx == robot_controller.current_target_index else (255, 255, 0)
-                            cv2.rectangle(display_image, (u - 30, v - 30), (u + 30, v + 30), color, 2)
-                            
-                            # 물체 번호
-                            cv2.putText(display_image, f"#{idx+1}", (u - 25, v - 35),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                            
-                            # 거리 정보
-                            cv2.putText(display_image, f"{obj['distance_from_center']:.3f}m", (u - 25, v + 50),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-                            
-                            # 카메라 좌표계 (미터)
-                            cam_text = f"Cam: ({obj['x']:.3f}, {obj['y']:.3f}, {obj['z']:.3f})"
-                            cv2.putText(display_image, cam_text, (u - 80, v + 70),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-                            
-                            # 로봇 목표 좌표계 (밀리미터) - 오프셋 적용
-                            robot_x = obj['x'] * 1000
-                            robot_y = obj['y'] * 1000 - 60   # Y축 -60mm
-                            robot_z = obj['z'] * 1000 - 150  # Z축 -150mm (뎁스 기반)
-                            robot_text = f"Rob: ({robot_x:.0f}, {robot_y:.0f}, {robot_z:.0f})"
-                            cv2.putText(display_image, robot_text, (u - 80, v + 85),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
-                
-                # 상태 정보 표시
-                if robot_controller.is_robot_moving:
-                    status_text = "ROBOT MOVING... (Camera paused)"
-                    cv2.putText(display_image, status_text, (10, 30),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+    # --- Perception ---
+    def detect_objects(self, pc_msg: PointCloud2) -> list:
+        """PointCloud 기반 객체 검출 (현재 mock 데이터 반환)"""
+        self.get_logger().info("Detecting objects from PointCloud...")
+        return [{"id": "can_1", "pose": {"x": 0.5, "y": 0.1, "z": 0.02}, "color": "red"}]
+
+    # --- Gripper ---
+    def gripper_open(self):
+        self.gripper_pub.publish(String(data="open"))
+        time.sleep(0.5)
+
+    def gripper_close(self):
+        self.gripper_pub.publish(String(data="close"))
+        time.sleep(0.5)
+
+    # --- Motion ---
+    def plan_and_execute_pick(self, obj_pose: Dict[str, float]) -> bool:
+        if self.emergency_stop:
+            self.get_logger().warn("Emergency active, aborting pick.")
+            return False
+        try:
+            self.gripper_open()
+            self.get_logger().info(f"Picking object at {obj_pose}")
+            self.gripper_close()
+            self.get_logger().info("Pick successful")
+            return True
+        except Exception as e:
+            self.get_logger().error(f"Pick failed: {e}")
+            return False
+
+    def plan_and_place(self, target_pose: Dict[str, float]) -> bool:
+        if self.emergency_stop:
+            self.get_logger().warn("Emergency active, aborting place.")
+            return False
+        try:
+            self.get_logger().info(f"Placing object at {target_pose}")
+            self.gripper_open()
+            self.get_logger().info("Place successful")
+            return True
+        except Exception as e:
+            self.get_logger().error(f"Place failed: {e}")
+            return False
+
+    # --- High-Level Logic ---
+    def pick_and_place_workflow(self):
+        if self.last_pc is None:
+            self.get_logger().info("Waiting for PointCloud...")
+            return
+
+        objs = self.detect_objects(self.last_pc)
+        for obj in objs:
+            with self.task_lock:
+                retries, success = 0, False
+                while retries < MAX_RETRIES and not success and not self.emergency_stop:
+                    self.get_logger().info(f"Attempt {retries + 1} to pick {obj['id']}")
+                    success = self.plan_and_execute_pick(obj["pose"])
+                    if not success:
+                        retries += 1
+                        time.sleep(0.5)
+
+                if not success:
+                    self.get_logger().error(f"Failed to pick {obj['id']} after {MAX_RETRIES} tries.")
+                    continue
+
+                target = self.find_shelf_slot()
+                if not target:
+                    self.get_logger().error("No shelf slot available, waiting.")
+                    continue
+
+                if self.plan_and_place(target):
+                    self.get_logger().info(f"Placed {obj['id']} at {target}")
                 else:
-                    status_text = "Standby (Press SPACE to detect)"
-                    cv2.putText(display_image, status_text, (10, 30),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                
-                if len(robot_controller.detected_objects) > 0:
-                    obj_text = f"Detected: {len(robot_controller.detected_objects)} objects"
-                    cv2.putText(display_image, obj_text, (10, 60),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-                    
-                    # 가장 가까운 물체 정보 추가
-                    nearest_obj = robot_controller.detected_objects[0]
-                    nearest_text = f"Nearest: {nearest_obj['distance_from_center']:.3f}m"
-                    cv2.putText(display_image, nearest_text, (10, 90),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                
-                cv2.imshow("RealSense Camera", display_image)
+                    self.get_logger().error("Place failed.")
 
-            key = cv2.waitKey(1) & 0xFF
-            
-            # ESC 키: 종료
-            if key == 27:
-                break
-            
-            # SPACE 키: 물체 감지 및 자동 수집 시작
-            elif key == 32:  # SPACE
-                if not robot_controller.auto_mode:
-                    print("\n물체 감지를 시작합니다...")
-                    robot_controller.detected_objects = robot_controller.detect_objects()
-                    
-                    if len(robot_controller.detected_objects) > 0:
-                        print(f"\n{'='*80}")
-                        print(f"총 {len(robot_controller.detected_objects)}개의 물체가 감지되었습니다.")
-                        print(f"{'='*80}")
-                        print("\n중심점으로부터 가까운 순서:")
-                        
-                        for idx, obj in enumerate(robot_controller.detected_objects):
-                            cam_x = obj['x']
-                            cam_y = obj['y']
-                            cam_z = obj['z']
-                            distance = obj['distance_from_center']
-                            length=obj['length']
-                            
-                            robot_x = cam_x * 1000
-                            robot_y = cam_y * 1000 - 60   # Y축 -60mm
-                            robot_z = cam_z * 1000 - 150  # Z축 -150mm (뎁스 기반)
+    def find_shelf_slot(self) -> Dict[str, float]:
+        """빈 선반 좌표 계산 (현재 mock 값)"""
+        return {"x": 0.8, "y": 0.2, "z": 0.5}
 
-                            gripper_pos = 650 if length < 30 else 520
-                            
-                            print(f"\n[물체 #{idx+1}]")
-                            print(f"  중심점 거리:      {distance:.3f}m ({distance*1000:.1f}mm)")
-                            print(f"  카메라 좌표 (m):  X={cam_x:.4f}, Y={cam_y:.4f}, Z={cam_z:.4f}")
-                            print(f"  로봇 목표 (mm):   X={robot_x:.1f}, Y={robot_y:.1f}, Z={robot_z:.1f}")
-                            print(f"  픽셀 좌표:        U={obj['pixel_u']}, V={obj['pixel_v']}")
-                        
-                        print(f"\n{'='*80}\n")
-                        
-                        # 자동 모드 활성화
-                        robot_controller.auto_mode = True
-                        robot_controller.current_target_index = 0
-                        robot_controller.process_next_object()
-                    else:
-                        print("감지된 물체가 없습니다.")
-            
-            # 자동 모드에서 다음 물체 처리
-            if robot_controller.auto_mode:
-                if robot_controller.current_target_index < len(robot_controller.detected_objects):
-                    time.sleep(0.5)  # 짧은 대기 후 다음 물체 처리
-                    robot_controller.process_next_object()
-                else:
-                    # 모든 물체 처리 완료
-                    robot_controller.auto_mode = False
-                    robot_controller.current_target_index = 0
-    
-    except KeyboardInterrupt:
-        print("\nCtrl+C로 종료합니다...")
+# --- FastAPI Interface ---
+api = FastAPI()
+agent_node = None
 
+@api.post("/voice_command")
+def voice_command_handler(cmd: Dict[str, Any]):
+    text = cmd.get("text", "").lower()
+    if "정지" in text or "멈춰" in text:
+        agent_node.emergency_cb(Bool(data=True))
+        return {"ok": True, "message": "Emergency Stop Activated"}
+    if "픽업" in text or "pick" in text:
+        threading.Thread(target=agent_node.pick_and_place_workflow, daemon=True).start()
+        return {"ok": True, "message": "Pick & Place Started"}
+    return {"ok": False, "message": "Unknown Command"}
+
+# --- Execution ---
+def start_ros_node():
+    global agent_node
+    rclpy.init(args=None)
+    agent_node = VLAAgent()
+    try:
+        rclpy.spin(agent_node)
+    except Exception as e:
+        print("ROS spin ended:", e)
     finally:
-        print("프로그램을 종료합니다...")
-        robot_controller.terminate_gripper()
-        cv2.destroyAllWindows()
-        robot_controller.destroy_node()
-        dsr_node.destroy_node()
+        agent_node.destroy_node()
         rclpy.shutdown()
-        print("종료 완료.")
+
+def start_api():
+    uvicorn.run(api, host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    ros_thread = threading.Thread(target=start_ros_node, daemon=True)
+    ros_thread.start()
+    time.sleep(1.0)
+    start_api()
+
 
 if __name__ == '__main__':
     main()

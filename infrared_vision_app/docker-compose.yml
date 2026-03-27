@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  infrared_vision_app:
+    build: .
+    container_name: infrared_vision_app
+    restart: unless-stopped
+    ports:
+      - "8010:8010"
+    environment:
+      APP_RELEASE_CHANNEL: compose-local
+      APP_DB_PATH: /app/data/infrared_vision.db
+      CORS_ALLOW_ORIGINS: http://127.0.0.1:8010,http://localhost:8010
+    volumes:
+      - ./data:/app/data

@@ -1,0 +1,127 @@
+version: "3.9"
+
+services:
+  edge_gateway:
+    image: ${EDGE_GATEWAY_IMAGE}
+    container_name: ${STACK_NAME}-edge-gateway
+    restart: unless-stopped
+    environment:
+      SITE_PROFILE: ${SITE_PROFILE}
+      OPERATIONS_API_URL: http://operations_api:8080
+      GPU_ENABLED: ${GPU_ENABLED}
+    networks:
+      - edge_net
+      - app_net
+    volumes:
+      - edge_data:/var/lib/infrared-edge
+
+  inference_service:
+    image: ${INFERENCE_IMAGE}
+    container_name: ${STACK_NAME}-inference
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      SITE_PROFILE: ${SITE_PROFILE}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      GPU_ENABLED: ${GPU_ENABLED}
+    networks:
+      - app_net
+
+  operations_api:
+    image: ${OPERATIONS_API_IMAGE}
+    container_name: ${STACK_NAME}-operations-api
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    environment:
+      SITE_PROFILE: ${SITE_PROFILE}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      OBJECT_STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER}
+      OBJECT_STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "${API_PORT}:8080"
+    networks:
+      - app_net
+
+  web_dashboard:
+    image: ${WEB_DASHBOARD_IMAGE}
+    container_name: ${STACK_NAME}-web-dashboard
+    restart: unless-stopped
+    depends_on:
+      - operations_api
+    environment:
+      API_BASE_URL: http://operations_api:8080
+      SITE_PROFILE: ${SITE_PROFILE}
+    ports:
+      - "${WEB_PORT}:80"
+    networks:
+      - app_net
+
+  postgres:
+    image: postgres:16
+    container_name: ${STACK_NAME}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${STACK_NAME}-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_net
+
+  minio:
+    image: minio/minio:latest
+    container_name: ${STACK_NAME}-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_PORT}:9000"
+    networks:
+      - app_net
+
+  reverse_proxy:
+    image: nginx:1.25
+    container_name: ${STACK_NAME}-reverse-proxy
+    restart: unless-stopped
+    depends_on:
+      - web_dashboard
+      - operations_api
+    ports:
+      - "80:80"
+    networks:
+      - app_net
+
+networks:
+  edge_net:
+    driver: bridge
+  app_net:
+    driver: bridge
+
+volumes:
+  edge_data:
+  postgres_data:
+  redis_data:
+  minio_data:

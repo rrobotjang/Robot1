@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Infrared Vision Safety App</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="auth-overlay" id="login-overlay">
+      <form class="auth-card" id="login-form">
+        <p class="eyebrow">Secure Access</p>
+        <h2>현장 안전관제 로그인</h2>
+        <p class="auth-copy">
+          적외선 카메라 추론, 벡터 가이드 검색, 이벤트 대응 기능은 역할 기반으로 제어됩니다.
+        </p>
+        <label>
+          아이디
+          <input id="username-input" name="username" type="text" autocomplete="username" required />
+        </label>
+        <label>
+          비밀번호
+          <input
+            id="password-input"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+        <button class="primary-submit" type="submit">로그인</button>
+        <p id="login-error" class="error-copy"></p>
+        <div class="demo-accounts">
+          <p class="eyebrow">Demo Accounts</p>
+          <ul>
+            <li><code>ops_admin</code> / <code>demo123!</code></li>
+            <li><code>field_operator</code> / <code>demo123!</code></li>
+            <li><code>road_manager</code> / <code>demo123!</code></li>
+            <li><code>safety_viewer</code> / <code>demo123!</code></li>
+          </ul>
+        </div>
+      </form>
+    </div>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Infrared Vision Safety</p>
+          <h1>적외선 카메라 안전관제 앱</h1>
+        </div>
+
+        <div class="topbar-tools">
+          <div class="profile-switch" id="profile-switch">
+            <button type="button" data-profile="logistics" class="is-active">물류센터</button>
+            <button type="button" data-profile="road">도로 관제</button>
+          </div>
+
+          <div class="session-box">
+            <div class="user-chip" id="user-chip">로그인 필요</div>
+            <button class="ghost-button" id="logout-button" type="button">로그아웃</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="hero-card">
+        <div>
+          <p class="eyebrow" id="hero-location">현장 로딩 중</p>
+          <h2 id="hero-title">실시간 위험 상황을 불러오는 중입니다.</h2>
+          <p id="hero-subtitle">카메라 상태와 이벤트 목록을 동기화하고 있습니다.</p>
+        </div>
+        <div class="hero-badges">
+          <span class="badge badge-dark" id="badge-role">권한 확인 중</span>
+          <span class="badge badge-info" id="badge-vector">Vector DB: -</span>
+          <span class="badge badge-warning">모바일 운영 최적화</span>
+        </div>
+      </section>
+
+      <section class="status-strip">
+        <div class="notice-banner" id="notice-banner">운영 상태를 준비하고 있습니다.</div>
+        <div class="status-actions">
+          <div class="sync-chip" id="sync-chip">동기화 대기</div>
+          <button class="ghost-button" id="refresh-button" type="button">새로고침</button>
+        </div>
+      </section>
+
+      <nav class="mobile-nav" id="mobile-nav">
+        <button type="button" data-scroll-target="live-section">실시간</button>
+        <button type="button" data-scroll-target="events-section">이벤트</button>
+        <button type="button" data-scroll-target="ops-section">운영도구</button>
+        <button type="button" data-scroll-target="detail-section">상세</button>
+      </nav>
+
+      <section class="summary-grid" id="summary-grid"></section>
+
+      <section class="content-grid">
+        <section class="panel" id="live-section">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Live Cameras</p>
+              <h3>실시간 모니터링</h3>
+            </div>
+            <span class="panel-tip">적외선 스트림 기반 현장 상태</span>
+          </div>
+          <div class="camera-grid" id="camera-grid"></div>
+        </section>
+
+        <section class="panel" id="events-section">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Incidents</p>
+              <h3>이벤트 목록</h3>
+            </div>
+            <span class="panel-tip">항목을 선택하면 상세 패널이 갱신됩니다.</span>
+          </div>
+          <div class="event-list" id="event-list"></div>
+        </section>
+      </section>
+
+      <section class="tool-grid">
+        <section class="panel" id="ops-section">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Inference API</p>
+              <h3>추론 실행</h3>
+            </div>
+            <span class="panel-tip">운영자 이상 권한에서 이벤트 후보를 생성합니다.</span>
+          </div>
+
+          <p id="inference-lock-note" class="lock-note"></p>
+
+          <form class="tool-form" id="inference-form">
+            <label>
+              카메라
+              <select id="inference-camera"></select>
+            </label>
+            <label>
+              열화상 요약
+              <textarea
+                id="inference-summary"
+                rows="4"
+                placeholder="예: 하역구역에서 작업자와 지게차가 서로 접근하고 있음"
+              ></textarea>
+            </label>
+            <label>
+              감지 객체
+              <input
+                id="inference-objects"
+                type="text"
+                placeholder="worker, forklift, pallet"
+              />
+            </label>
+            <label class="checkbox-row">
+              <input id="inference-sliding-window" type="checkbox" />
+              슬라이딩 윈도우 스캔 사용
+            </label>
+            <label>
+              열화상 매트릭스
+              <textarea
+                id="inference-thermal-matrix"
+                rows="5"
+                placeholder="0.12 0.15 0.20 0.18&#10;0.18 0.82 0.88 0.24&#10;0.20 0.84 0.91 0.26&#10;0.12 0.18 0.22 0.15"
+              ></textarea>
+            </label>
+            <label>
+              운영자 메모
+              <input
+                id="inference-note"
+                type="text"
+                placeholder="예: 야간조 교차 작업 중"
+              />
+            </label>
+            <label class="checkbox-row">
+              <input id="inference-auto-create" type="checkbox" checked />
+              이벤트 자동 생성
+            </label>
+            <button class="primary-submit" id="run-inference" type="submit">추론 실행</button>
+          </form>
+
+          <div class="result-panel empty-state" id="inference-result">
+            추론을 실행하면 감지 결과와 자동 생성 이벤트 후보가 표시됩니다.
+          </div>
+        </section>
+
+        <section class="panel" id="knowledge-section">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Vector Search</p>
+              <h3>대응 가이드 검색</h3>
+            </div>
+            <span class="panel-tip">이벤트 맥락에 맞는 대응 문서를 벡터 검색합니다.</span>
+          </div>
+
+          <form class="tool-form compact-form" id="search-form">
+            <label>
+              검색어
+              <input
+                id="search-query"
+                type="text"
+                placeholder="예: 작업자 지게차 충돌 대응"
+              />
+            </label>
+            <button class="secondary-submit" type="submit">가이드 검색</button>
+          </form>
+
+          <div class="search-results empty-state" id="search-results">
+            검색 결과가 여기 표시됩니다.
+          </div>
+        </section>
+      </section>
+
+      <section class="detail-grid" id="detail-section">
+        <section class="panel detail-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Selected Event</p>
+              <h3>이벤트 상세</h3>
+            </div>
+          </div>
+          <div id="event-detail" class="event-detail empty-state">
+            이벤트를 선택하면 상세 정보가 표시됩니다.
+          </div>
+        </section>
+
+        <section class="panel detail-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Response Timeline</p>
+              <h3>대응 이력</h3>
+            </div>
+          </div>
+          <div id="timeline" class="timeline empty-state">
+            대응 이력이 아직 없습니다.
+          </div>
+        </section>
+      </section>
+
+      <section class="ops-grid" id="ops-health-section">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">System Health</p>
+              <h3>운영 상태</h3>
+            </div>
+          </div>
+          <div id="system-status" class="empty-state">
+            시스템 상태를 불러오는 중입니다.
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Audit Log</p>
+              <h3>감사 로그</h3>
+            </div>
+            <span class="panel-tip">관리자 전용</span>
+          </div>
+          <div id="audit-logs" class="empty-state">
+            감사 로그가 여기 표시됩니다.
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

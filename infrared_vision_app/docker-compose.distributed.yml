@@ -1,0 +1,152 @@
+version: "3.9"
+
+services:
+  gateway_a:
+    build: .
+    container_name: gateway_a
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8010"]
+    restart: unless-stopped
+    env_file:
+      - .env.distributed
+    environment:
+      APP_NAME: ${APP_NAME:-Infrared Vision Gateway}
+      APP_RELEASE_CHANNEL: ${APP_RELEASE_CHANNEL:-distributed}
+      DB_BACKEND: ${DB_BACKEND:-postgresql}
+      DB_URL: ${DB_URL:-postgresql://infrared:infrared@postgres:5432/infrared_vision}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}
+      IAM_MODE: ${IAM_MODE:-external}
+      IAM_SERVICE_URL: ${IAM_SERVICE_URL:-http://infrared_iam:8020}
+      CV_SERVICE_MODE: ${CV_SERVICE_MODE:-remote}
+      CV_SERVICE_URL: ${CV_SERVICE_URL:-http://infrared_cv_service:8030}
+      CV_SERVICE_TIMEOUT: ${CV_SERVICE_TIMEOUT:-10.0}
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-redis}
+      QUEUE_URL: ${QUEUE_URL:-redis://redis:6379/0}
+      QUEUE_NAME: ${QUEUE_NAME:-infrared:inference:queue}
+      QUEUE_RESULT_TTL_SECONDS: ${QUEUE_RESULT_TTL_SECONDS:-3600}
+      AUTH_SECRET: ${AUTH_SECRET:-infrared-vision-demo-secret}
+    depends_on:
+      - postgres
+      - redis
+      - infrared_iam
+      - infrared_cv_service
+
+  gateway_b:
+    build: .
+    container_name: gateway_b
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8010"]
+    restart: unless-stopped
+    env_file:
+      - .env.distributed
+    environment:
+      APP_NAME: ${APP_NAME:-Infrared Vision Gateway}
+      APP_RELEASE_CHANNEL: ${APP_RELEASE_CHANNEL:-distributed}
+      DB_BACKEND: ${DB_BACKEND:-postgresql}
+      DB_URL: ${DB_URL:-postgresql://infrared:infrared@postgres:5432/infrared_vision}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}
+      IAM_MODE: ${IAM_MODE:-external}
+      IAM_SERVICE_URL: ${IAM_SERVICE_URL:-http://infrared_iam:8020}
+      CV_SERVICE_MODE: ${CV_SERVICE_MODE:-remote}
+      CV_SERVICE_URL: ${CV_SERVICE_URL:-http://infrared_cv_service:8030}
+      CV_SERVICE_TIMEOUT: ${CV_SERVICE_TIMEOUT:-10.0}
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-redis}
+      QUEUE_URL: ${QUEUE_URL:-redis://redis:6379/0}
+      QUEUE_NAME: ${QUEUE_NAME:-infrared:inference:queue}
+      QUEUE_RESULT_TTL_SECONDS: ${QUEUE_RESULT_TTL_SECONDS:-3600}
+      AUTH_SECRET: ${AUTH_SECRET:-infrared-vision-demo-secret}
+    depends_on:
+      - postgres
+      - redis
+      - infrared_iam
+      - infrared_cv_service
+
+  infrared_worker:
+    build: .
+    container_name: infrared_worker
+    command: ["python", "inference_worker.py"]
+    restart: unless-stopped
+    env_file:
+      - .env.distributed
+    environment:
+      APP_RELEASE_CHANNEL: ${WORKER_RELEASE_CHANNEL:-worker}
+      DB_BACKEND: ${DB_BACKEND:-postgresql}
+      DB_URL: ${DB_URL:-postgresql://infrared:infrared@postgres:5432/infrared_vision}
+      CV_SERVICE_MODE: ${CV_SERVICE_MODE:-remote}
+      CV_SERVICE_URL: ${CV_SERVICE_URL:-http://infrared_cv_service:8030}
+      CV_SERVICE_TIMEOUT: ${CV_SERVICE_TIMEOUT:-10.0}
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-redis}
+      QUEUE_URL: ${QUEUE_URL:-redis://redis:6379/0}
+      QUEUE_NAME: ${QUEUE_NAME:-infrared:inference:queue}
+      QUEUE_RESULT_TTL_SECONDS: ${QUEUE_RESULT_TTL_SECONDS:-3600}
+    depends_on:
+      - postgres
+      - redis
+      - infrared_cv_service
+
+  infrared_iam:
+    build: .
+    container_name: infrared_iam
+    command: ["uvicorn", "iam_service_app:app", "--host", "0.0.0.0", "--port", "8020"]
+    restart: unless-stopped
+    env_file:
+      - .env.distributed
+    environment:
+      APP_RELEASE_CHANNEL: ${IAM_RELEASE_CHANNEL:-iam}
+      DB_BACKEND: ${DB_BACKEND:-postgresql}
+      DB_URL: ${DB_URL:-postgresql://infrared:infrared@postgres:5432/infrared_vision}
+      AUTH_SECRET: ${AUTH_SECRET:-infrared-vision-demo-secret}
+      AUTH_EXPIRES_MINUTES: ${AUTH_EXPIRES_MINUTES:-30}
+      AUTH_REFRESH_EXPIRES_DAYS: ${AUTH_REFRESH_EXPIRES_DAYS:-7}
+    depends_on:
+      - postgres
+
+  infrared_cv_service:
+    build: .
+    container_name: infrared_cv_service
+    command: ["uvicorn", "cv_service_app:app", "--host", "0.0.0.0", "--port", "8030"]
+    restart: unless-stopped
+    env_file:
+      - .env.distributed
+    environment:
+      APP_RELEASE_CHANNEL: ${CV_RELEASE_CHANNEL:-cv}
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: infrared_postgres
+    restart: unless-stopped
+    env_file:
+      - .env.distributed
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-infrared_vision}
+      POSTGRES_USER: ${POSTGRES_USER:-infrared}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infrared}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-infrared} -d ${POSTGRES_DB:-infrared_vision}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: infrared_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: infrared_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gateway_a
+      - gateway_b
+
+volumes:
+  postgres_data:
